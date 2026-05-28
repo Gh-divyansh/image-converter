@@ -21,8 +21,7 @@ const MIME = {
   png:  "image/png",
   webp: "image/webp",
   avif: "image/avif",
-  tiff: "image/tiff",
-  gif:  "image/gif"
+  tiff: "image/tiff"
 };
 
 const supportedFormats = Object.keys(MIME);
@@ -133,9 +132,6 @@ module.exports = async (req, res) => {
         });
         break;
 
-      case "gif":
-        image = image.gif();
-        break;
     }
 
     const buffer = await image.toBuffer();
