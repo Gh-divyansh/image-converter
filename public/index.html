@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ImgCrush — Image Converter & Compressor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="container">
+
+    <header class="header">
+      <div class="logo">
+        <span class="logo-icon">⚡</span>
+        <span class="logo-text">ImgCrush</span>
+      </div>
+      <p class="tagline">Convert & compress images in seconds</p>
+    </header>
+
+    <div class="upload-box" id="uploadBox">
+      <input type="file" id="imageInput" multiple accept="image/*" hidden />
+      <div class="upload-inner">
+        <div class="upload-icon">🖼️</div>
+        <p class="upload-title">Drop images here</p>
+        <p class="upload-sub">or <span class="upload-link">browse files</span> — JPG, PNG, WEBP, AVIF, TIFF, GIF</p>
+      </div>
+    </div>
+
+    <!-- Global controls bar -->
+    <div class="global-bar" id="globalBar">
+      <div class="global-controls">
+        <label class="global-label">All as</label>
+        <select id="globalFormat" class="global-select">
+          <option value="">— keep each —</option>
+          <option value="webp">WEBP</option>
+          <option value="avif">AVIF</option>
+          <option value="jpeg">JPEG</option>
+          <option value="png">PNG</option>
+          <option value="tiff">TIFF</option>
+          <option value="gif">GIF</option>
+        </select>
+        <label class="global-label">Quality</label>
+        <input type="range" id="globalQuality" class="global-range" min="1" max="100" value="80" />
+        <span id="globalQualityVal" class="quality-num">80</span>
+      </div>
+      <button id="convertAllBtn" class="convert-all-btn">
+        ⚡ Convert All
+      </button>
+    </div>
+
+    <div class="images-container" id="imagesContainer"></div>
+
+    <div class="empty-state" id="emptyState">
+      <p>No images yet — add some above!</p>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
