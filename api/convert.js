@@ -3,22 +3,26 @@ const sharp = require("sharp");
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
+
+  // 20MB limit
+  limits: { fileSize: 20 * 1024 * 1024 },
+
   fileFilter: (req, file, cb) => {
     if (!file.mimetype.startsWith("image/")) {
       return cb(new Error("Only image files allowed"));
     }
+
     cb(null, true);
   }
 });
 
 const MIME = {
   jpeg: "image/jpeg",
-  png: "image/png",
+  png:  "image/png",
   webp: "image/webp",
   avif: "image/avif",
   tiff: "image/tiff",
-  gif: "image/gif"
+  gif:  "image/gif"
 };
 
 const supportedFormats = Object.keys(MIME);
@@ -26,13 +30,17 @@ const supportedFormats = Object.keys(MIME);
 function runMiddleware(req, res, fn) {
   return new Promise((resolve, reject) => {
     fn(req, res, result => {
-      if (result instanceof Error) return reject(result);
+      if (result instanceof Error) {
+        return reject(result);
+      }
+
       resolve(result);
     });
   });
 }
 
 module.exports = async (req, res) => {
+
   if (req.method !== "POST") {
     return res.status(405).json({
       success: false,
@@ -41,7 +49,12 @@ module.exports = async (req, res) => {
   }
 
   try {
-    await runMiddleware(req, res, upload.single("image"));
+
+    await runMiddleware(
+      req,
+      res,
+      upload.single("image")
+    );
 
     if (!req.file) {
       return res.status(400).json({
@@ -51,9 +64,13 @@ module.exports = async (req, res) => {
     }
 
     const targetFormat = req.body.format;
+
     const quality = Math.min(
       100,
-      Math.max(1, parseInt(req.body.quality) || 80)
+      Math.max(
+        1,
+        parseInt(req.body.quality) || 80
+      )
     );
 
     if (!supportedFormats.includes(targetFormat)) {
@@ -64,26 +81,35 @@ module.exports = async (req, res) => {
     }
 
     const originalSize = req.file.size;
-    const ext = targetFormat === "jpeg"
-      ? "jpg"
-      : targetFormat;
+
+    const ext =
+      targetFormat === "jpeg"
+        ? "jpg"
+        : targetFormat;
 
     let image = sharp(req.file.buffer);
 
     image = image.rotate();
 
     image = image.resize({
-      width: 2500,
+      width: 3500,
       withoutEnlargement: true
     });
 
     switch (targetFormat) {
+
       case "webp":
-        image = image.webp({ quality, effort: 6 });
+        image = image.webp({
+          quality,
+          effort: 6
+        });
         break;
 
       case "avif":
-        image = image.avif({ quality, effort: 5 });
+        image = image.avif({
+          quality,
+          effort: 5
+        });
         break;
 
       case "jpeg":
@@ -115,7 +141,10 @@ module.exports = async (req, res) => {
     const buffer = await image.toBuffer();
 
     const convertedSize = buffer.length;
-    const savedBytes = originalSize - convertedSize;
+
+    const savedBytes =
+      originalSize - convertedSize;
+
     const savedPercent = (
       (savedBytes / originalSize) * 100
     ).toFixed(1);
@@ -163,7 +192,15 @@ module.exports = async (req, res) => {
     return res.send(buffer);
 
   } catch (error) {
+
     console.error(error);
+
+    if (error.code === "LIMIT_FILE_SIZE") {
+      return res.status(413).json({
+        success: false,
+        message: "Image exceeds 20MB limit"
+      });
+    }
 
     return res.status(500).json({
       success: false,
@@ -173,10 +210,19 @@ module.exports = async (req, res) => {
 };
 
 function formatBytes(bytes) {
-  if (bytes === 0) return "0 B";
+
+  if (bytes === 0) {
+    return "0 B";
+  }
 
   const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
+
+  const sizes = [
+    "B",
+    "KB",
+    "MB",
+    "GB"
+  ];
 
   const i = Math.floor(
     Math.log(bytes) / Math.log(k)

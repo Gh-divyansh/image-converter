@@ -54,10 +54,34 @@ convertAllBtn.addEventListener("click", () => {
 });
 
 // ── File handling ─────────────────────────────────────────────────────────────
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
+
 function handleFiles(files) {
-  const images = files.filter(f => f.type.startsWith("image/"));
-  if (!images.length) return;
+
+  const images = files.filter(file => {
+
+    if (!file.type.startsWith("image/")) {
+      return false;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+
+      alert(
+        `${file.name} exceeds 20MB upload limit`
+      );
+
+      return false;
+    }
+
+    return true;
+  });
+
+  if (!images.length) {
+    return;
+  }
+
   images.forEach(createImageCard);
+
   updateUI();
 }
 
