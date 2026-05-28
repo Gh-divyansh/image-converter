@@ -118,7 +118,6 @@ function createImageCard(file) {
             <option value="jpeg">JPEG</option>
             <option value="png">PNG</option>
             <option value="tiff">TIFF</option>
-            <option value="gif">GIF</option>
           </select>
           <div class="quality-wrap">
             <label class="quality-label">Quality</label>
