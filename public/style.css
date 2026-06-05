@@ -207,6 +207,7 @@ select {
 }
 
 .secondary-btn,
+.ghost-btn,
 .convert-btn,
 .convert-all-btn,
 .download-btn {
@@ -225,10 +226,23 @@ select {
   color: #04111d;
 }
 
+.ghost-btn {
+  background: rgba(144, 163, 191, 0.08);
+  color: var(--text);
+  border: 1px solid rgba(144, 163, 191, 0.18);
+}
+
 .secondary-btn:hover,
+.ghost-btn:hover,
 .convert-btn:hover:not([disabled]),
 .convert-all-btn:hover:not([disabled]) {
   transform: translateY(-1px);
+}
+
+.ghost-btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .global-bar {
@@ -302,6 +316,42 @@ select {
   color: var(--accent);
   font-family: var(--mono);
   font-size: 12px;
+}
+
+.watermark-file-row,
+.watermark-image-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+}
+
+.watermark-file-meta,
+.watermark-image-status {
+  flex: 1;
+  min-width: 0;
+}
+
+.watermark-file-meta strong,
+.watermark-image-status strong {
+  display: block;
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.watermark-file-meta span,
+.watermark-image-status span {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .batch-status {
@@ -653,7 +703,8 @@ select {
 
   .global-head,
   .link-row,
-  .button-row {
+  .button-row,
+  .watermark-file-row {
     flex-direction: column;
   }
 

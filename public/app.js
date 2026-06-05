@@ -24,6 +24,10 @@ const globalWidth = document.getElementById("globalWidth");
 const globalHeight = document.getElementById("globalHeight");
 const globalFit = document.getElementById("globalFit");
 const globalWatermark = document.getElementById("globalWatermark");
+const globalWatermarkImageInput = document.getElementById("globalWatermarkImageInput");
+const globalWatermarkImageBtn = document.getElementById("globalWatermarkImageBtn");
+const clearGlobalWatermarkImageBtn = document.getElementById("clearGlobalWatermarkImageBtn");
+const globalWatermarkImageName = document.getElementById("globalWatermarkImageName");
 const globalWatermarkPosition = document.getElementById("globalWatermarkPosition");
 const globalWatermarkOpacity = document.getElementById("globalWatermarkOpacity");
 const globalWatermarkOpacityVal = document.getElementById("globalWatermarkOpacityVal");
@@ -38,6 +42,8 @@ const dragState = {
   activeId: null,
   armedId: null
 };
+let globalWatermarkImage = null;
+let globalWatermarkImageCount = 0;
 let cardCount = 0;
 let pastedImageCount = 0;
 
@@ -74,6 +80,20 @@ function wireEvents() {
 
   addUrlBtn.addEventListener("click", () => {
     addImageUrl(imageUrlInput.value);
+  });
+
+  globalWatermarkImageBtn.addEventListener("click", () => {
+    globalWatermarkImageInput.click();
+  });
+
+  globalWatermarkImageInput.addEventListener("change", event => {
+    const file = event.target.files?.[0] || null;
+    applyGlobalWatermarkImage(file);
+    globalWatermarkImageInput.value = "";
+  });
+
+  clearGlobalWatermarkImageBtn.addEventListener("click", () => {
+    applyGlobalWatermarkImage(null);
   });
 
   imageUrlInput.addEventListener("keydown", event => {
@@ -245,6 +265,13 @@ function createImageCard(source) {
           <span>Watermark text</span>
           <input type="text" class="card-watermark" maxlength="120" placeholder="Optional text watermark" />
         </label>
+        <div class="field field-wide">
+          <span>Watermark image</span>
+          <div class="watermark-image-status">
+            <strong class="card-watermark-image-label">No image selected</strong>
+            <span>Controlled from the global watermark image picker.</span>
+          </div>
+        </div>
         <label class="field">
           <span>Watermark position</span>
           <select class="card-watermark-position">
@@ -281,12 +308,17 @@ function createImageCard(source) {
   cards.set(id, {
     id,
     ...source,
+    watermarkImageFile: globalWatermarkImage?.file || null,
+    watermarkImageKey: globalWatermarkImage?.key || null,
+    watermarkImageName: globalWatermarkImage?.file?.name || "",
     downloadUrl: null,
     lastConvertedBlob: null,
-    lastConvertedSettings: null
+    lastConvertedSettings: null,
+    lastConvertedWatermarkImageFile: null
   });
 
   populateCardSettings(card, settings);
+  syncCardWatermarkImage(card, globalWatermarkImage);
   wireCard(card);
   hydratePreview(card, source.previewUrl);
   imagesContainer.appendChild(card);
@@ -415,6 +447,7 @@ async function convertCard(card) {
     state.downloadUrl = blobUrl;
     state.lastConvertedBlob = blob;
     state.lastConvertedSettings = settings;
+    state.lastConvertedWatermarkImageFile = state.watermarkImageFile;
     downloadBtn.href = blobUrl;
     downloadBtn.download = `${originalBaseName}_converted.${extension}`;
     downloadBtn.style.display = "inline-flex";
@@ -453,6 +486,7 @@ async function convertAllCardsToZip() {
   const formData = new FormData();
   const metadata = [];
   let fileIndex = 0;
+  const watermarkFieldByKey = new Map();
 
   for (const [index, card] of cardElements.entries()) {
     const state = cards.get(card.dataset.id);
@@ -470,6 +504,16 @@ async function convertAllCardsToZip() {
       fileIndex += 1;
     } else {
       item.imageUrl = state.imageUrl;
+    }
+
+    if (state.watermarkImageFile && state.watermarkImageKey) {
+      if (!watermarkFieldByKey.has(state.watermarkImageKey)) {
+        const watermarkField = `watermark_${watermarkFieldByKey.size}`;
+        watermarkFieldByKey.set(state.watermarkImageKey, watermarkField);
+        formData.append(watermarkField, state.watermarkImageFile);
+      }
+
+      item.watermarkField = watermarkFieldByKey.get(state.watermarkImageKey);
     }
 
     metadata.push(item);
@@ -536,6 +580,31 @@ function applyGlobalSettings() {
 
   imagesContainer.querySelectorAll(".image-card").forEach(card => {
     populateCardSettings(card, settings);
+  });
+}
+
+function applyGlobalWatermarkImage(file) {
+  if (file && !file.type.startsWith("image/")) {
+    window.alert("Watermark image must be an image file.");
+    return;
+  }
+
+  if (file && file.size > MAX_FILE_SIZE) {
+    window.alert("Watermark image exceeds the 20MB upload limit.");
+    return;
+  }
+
+  globalWatermarkImage = file
+    ? {
+        file,
+        key: `wm_${++globalWatermarkImageCount}`
+      }
+    : null;
+
+  updateGlobalWatermarkImageUI();
+
+  imagesContainer.querySelectorAll(".image-card").forEach(card => {
+    syncCardWatermarkImage(card, globalWatermarkImage);
   });
 }
 
@@ -712,6 +781,7 @@ function syncGlobalControls(settings) {
   globalWatermarkPosition.value = settings.watermarkPosition;
   globalWatermarkOpacity.value = settings.watermarkOpacity;
   globalWatermarkOpacityVal.textContent = `${settings.watermarkOpacity}%`;
+  updateGlobalWatermarkImageUI();
 }
 
 function releaseCardResources(state) {
@@ -724,13 +794,42 @@ function releaseCardResources(state) {
   }
 }
 
-function buildConversionFormData(state, settings) {
+function syncCardWatermarkImage(card, watermarkImageState) {
+  const state = cards.get(card.dataset.id);
+
+  if (!state) {
+    return;
+  }
+
+  state.watermarkImageFile = watermarkImageState?.file || null;
+  state.watermarkImageKey = watermarkImageState?.key || null;
+  state.watermarkImageName = watermarkImageState?.file?.name || "";
+
+  const label = card.querySelector(".card-watermark-image-label");
+
+  if (label) {
+    label.textContent = state.watermarkImageName || "No image selected";
+  }
+}
+
+function updateGlobalWatermarkImageUI() {
+  globalWatermarkImageName.textContent = globalWatermarkImage?.file?.name || "No image selected";
+  clearGlobalWatermarkImageBtn.disabled = !globalWatermarkImage;
+}
+
+function buildConversionFormData(state, settings, assets = {}) {
   const formData = new FormData();
 
   if (state.sourceType === "file") {
     formData.append("image", state.file);
   } else {
     formData.append("imageUrl", state.imageUrl);
+  }
+
+  const watermarkImageFile = assets.watermarkImageFile ?? state.watermarkImageFile;
+
+  if (watermarkImageFile) {
+    formData.append("watermarkImage", watermarkImageFile);
   }
 
   appendSettings(formData, settings);
@@ -764,7 +863,9 @@ async function copyConvertedImage(card) {
       };
       const response = await fetch("/convert", {
         method: "POST",
-        body: buildConversionFormData(state, pngSettings)
+        body: buildConversionFormData(state, pngSettings, {
+          watermarkImageFile: state.lastConvertedWatermarkImageFile
+        })
       });
 
       if (!response.ok) {

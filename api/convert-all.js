@@ -1,6 +1,6 @@
 const {
   buildOutputName,
-  convertImageBuffer,
+  convertImageBufferWithAssets,
   getSourceBuffer,
   parseOptions,
   runMiddleware,
@@ -40,7 +40,11 @@ module.exports = async (req, res) => {
         imageUrl: item.imageUrl
       });
 
-      const result = await convertImageBuffer(source.buffer, options);
+      const result = await convertImageBufferWithAssets(source.buffer, options, {
+        watermarkImageBuffer: item.watermarkField
+          ? fileMap.get(item.watermarkField)?.buffer || null
+          : null
+      });
       const baseName = sanitizeBaseName(item.outputBaseName || source.sourceName);
       const entryName = ensureUniqueName(
         buildOutputName(baseName, options.format),

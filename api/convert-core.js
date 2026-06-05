@@ -160,6 +160,10 @@ async function fetchRemoteImage(imageUrl) {
 }
 
 async function convertImageBuffer(inputBuffer, options) {
+  return convertImageBufferWithAssets(inputBuffer, options, {});
+}
+
+async function convertImageBufferWithAssets(inputBuffer, options, assets = {}) {
   let image = sharp(inputBuffer, { failOn: "none" }).rotate();
 
   if (options.width || options.height) {
@@ -173,6 +177,29 @@ async function convertImageBuffer(inputBuffer, options) {
 
   const normalized = await image.toBuffer({ resolveWithObject: true });
   let output = sharp(normalized.data, { failOn: "none" });
+
+  if (
+    assets.watermarkImageBuffer &&
+    options.watermarkOpacity > 0 &&
+    normalized.info.width >= 48 &&
+    normalized.info.height >= 48
+  ) {
+    const watermarkImageLayer = await buildWatermarkImageSvg(
+      normalized.info.width,
+      normalized.info.height,
+      assets.watermarkImageBuffer,
+      options.watermarkOpacity
+    );
+
+    if (watermarkImageLayer) {
+      output = output.composite([
+        {
+          input: watermarkImageLayer,
+          gravity: options.watermarkPosition
+        }
+      ]);
+    }
+  }
 
   if (
     options.watermarkText &&
@@ -202,6 +229,41 @@ async function convertImageBuffer(inputBuffer, options) {
     originalSize: inputBuffer.length,
     convertedSize: buffer.length
   };
+}
+
+async function buildWatermarkImageSvg(baseWidth, baseHeight, watermarkBuffer, opacity) {
+  const maxWidth = Math.max(36, Math.min(420, Math.round(baseWidth * 0.24)));
+  const maxHeight = Math.max(36, Math.min(280, Math.round(baseHeight * 0.24)));
+  const margin = Math.max(12, Math.round(Math.min(baseWidth, baseHeight) * 0.035));
+  const watermark = sharp(watermarkBuffer, { failOn: "none" }).rotate().resize({
+    width: maxWidth,
+    height: maxHeight,
+    fit: "inside",
+    withoutEnlargement: true
+  });
+  const resized = await watermark.png().toBuffer({ resolveWithObject: true });
+
+  if (!resized.info.width || !resized.info.height) {
+    return null;
+  }
+
+  const encoded = resized.data.toString("base64");
+  const safeOpacity = Math.max(0, Math.min(1, opacity));
+
+  return Buffer.from(
+    `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${resized.info.width + margin * 2}" height="${resized.info.height + margin * 2}">
+        <image
+          x="${margin}"
+          y="${margin}"
+          width="${resized.info.width}"
+          height="${resized.info.height}"
+          opacity="${safeOpacity}"
+          href="data:image/png;base64,${encoded}"
+        />
+      </svg>
+    `
+  );
 }
 
 function applyFormat(image, format, quality) {
@@ -364,12 +426,33 @@ module.exports = {
   MAX_FILE_SIZE,
   buildOutputName,
   convertImageBuffer,
+  convertImageBufferWithAssets,
   formatBytes,
   getOutputExtension,
   getSourceBuffer,
   parseOptions,
   runMiddleware,
   sanitizeBaseName,
-  uploadSingle: upload.single("image"),
+  getFieldFile,
+  uploadSingle: upload.fields([
+    { name: "image", maxCount: 1 },
+    { name: "watermarkImage", maxCount: 1 }
+  ]),
   uploadAny: upload.any()
 };
+
+function getFieldFile(files, fieldName) {
+  if (!files) {
+    return null;
+  }
+
+  if (Array.isArray(files)) {
+    return files.find(file => file.fieldname === fieldName) || null;
+  }
+
+  if (files[fieldName]?.length) {
+    return files[fieldName][0];
+  }
+
+  return null;
+}

@@ -14,6 +14,7 @@ Image converter and compressor built with Express, `sharp`, and a static fronten
 - Resize with custom width and height controls.
 - Choose fit modes including contain, cover/crop, fill, inside, and outside.
 - Add an optional text watermark with adjustable opacity and position.
+- Add an optional image watermark with adjustable opacity and position.
 - Save default output settings in the browser for the next session.
 
 ## Run locally

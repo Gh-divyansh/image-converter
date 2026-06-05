@@ -99,6 +99,19 @@
           <input type="text" id="globalWatermark" maxlength="120" placeholder="Optional text watermark" />
         </label>
 
+        <div class="field field-wide">
+          <span>Watermark image</span>
+          <div class="watermark-file-row">
+            <input type="file" id="globalWatermarkImageInput" accept="image/*" hidden />
+            <button id="globalWatermarkImageBtn" class="secondary-btn" type="button">Choose Image</button>
+            <button id="clearGlobalWatermarkImageBtn" class="ghost-btn" type="button">Clear</button>
+            <div class="watermark-file-meta">
+              <strong id="globalWatermarkImageName">No image selected</strong>
+              <span>Applies to every card and ZIP export.</span>
+            </div>
+          </div>
+        </div>
+
         <label class="field">
           <span>Watermark position</span>
           <select id="globalWatermarkPosition" class="global-select">

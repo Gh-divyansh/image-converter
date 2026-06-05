@@ -1,8 +1,9 @@
 const {
   MIME,
   buildOutputName,
-  convertImageBuffer,
+  convertImageBufferWithAssets,
   formatBytes,
+  getFieldFile,
   getSourceBuffer,
   parseOptions,
   runMiddleware,
@@ -22,10 +23,12 @@ module.exports = async (req, res) => {
 
     const options = parseOptions(req.body);
     const source = await getSourceBuffer({
-      file: req.file,
+      file: getFieldFile(req.files, "image"),
       imageUrl: req.body.imageUrl
     });
-    const result = await convertImageBuffer(source.buffer, options);
+    const result = await convertImageBufferWithAssets(source.buffer, options, {
+      watermarkImageBuffer: getFieldFile(req.files, "watermarkImage")?.buffer || null
+    });
     const savedBytes = result.originalSize - result.convertedSize;
 
     const savedPercent = (
