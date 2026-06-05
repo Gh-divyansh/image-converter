@@ -9,6 +9,7 @@ const DEFAULT_SETTINGS = {
   watermarkKind: "text",
   watermarkText: "",
   watermarkPosition: "southeast",
+  watermarkScale: 24,
   watermarkOpacity: 18
 };
 
@@ -33,6 +34,8 @@ const globalWatermarkImageName = document.getElementById("globalWatermarkImageNa
 const globalWatermarkPosition = document.getElementById("globalWatermarkPosition");
 const globalWatermarkOpacity = document.getElementById("globalWatermarkOpacity");
 const globalWatermarkOpacityVal = document.getElementById("globalWatermarkOpacityVal");
+const globalWatermarkScale = document.getElementById("globalWatermarkScale");
+const globalWatermarkScaleVal = document.getElementById("globalWatermarkScaleVal");
 const convertAllBtn = document.getElementById("convertAllBtn");
 const batchProgress = document.getElementById("batchProgress");
 const batchProgressFill = document.getElementById("batchProgressFill");
@@ -132,6 +135,11 @@ function wireEvents() {
 
   globalWatermarkOpacity.addEventListener("input", () => {
     globalWatermarkOpacityVal.textContent = `${globalWatermarkOpacity.value}%`;
+    applyGlobalSettings();
+  });
+
+  globalWatermarkScale.addEventListener("input", () => {
+    globalWatermarkScaleVal.textContent = `${globalWatermarkScale.value}%`;
     applyGlobalSettings();
   });
 
@@ -307,6 +315,13 @@ function createImageCard(source) {
             <strong class="watermark-value"></strong>
           </div>
         </label>
+        <label class="field">
+          <span>Watermark size</span>
+          <div class="range-field">
+            <input type="range" class="card-watermark-scale" min="5" max="60" />
+            <strong class="watermark-scale-value"></strong>
+          </div>
+        </label>
       </div>
       <div class="button-row">
         <button class="convert-btn" type="button">Convert</button>
@@ -348,6 +363,8 @@ function wireCard(card) {
   const qualityValue = card.querySelector(".range-value");
   const opacityInput = card.querySelector(".card-watermark-opacity");
   const opacityValue = card.querySelector(".watermark-value");
+  const scaleInput = card.querySelector(".card-watermark-scale");
+  const scaleValue = card.querySelector(".watermark-scale-value");
   const watermarkKindSelect = card.querySelector(".card-watermark-kind");
   const watermarkImageInput = card.querySelector(".card-watermark-image-input");
   const watermarkImageBtn = card.querySelector(".card-watermark-image-btn");
@@ -360,6 +377,10 @@ function wireCard(card) {
 
   opacityInput.addEventListener("input", () => {
     opacityValue.textContent = `${opacityInput.value}%`;
+  });
+
+  scaleInput.addEventListener("input", () => {
+    scaleValue.textContent = `${scaleInput.value}%`;
   });
 
   watermarkKindSelect.addEventListener("change", () => {
@@ -657,6 +678,8 @@ function populateCardSettings(card, settings) {
   card.querySelector(".card-watermark-position").value = settings.watermarkPosition;
   card.querySelector(".card-watermark-opacity").value = settings.watermarkOpacity;
   card.querySelector(".watermark-value").textContent = `${settings.watermarkOpacity}%`;
+  card.querySelector(".card-watermark-scale").value = settings.watermarkScale;
+  card.querySelector(".watermark-scale-value").textContent = `${settings.watermarkScale}%`;
 }
 
 function readGlobalSettings() {
@@ -669,6 +692,7 @@ function readGlobalSettings() {
     watermarkKind: globalWatermarkKind?.value || DEFAULT_SETTINGS.watermarkKind,
     watermarkText: globalWatermark.value,
     watermarkPosition: globalWatermarkPosition.value,
+    watermarkScale: globalWatermarkScale.value,
     watermarkOpacity: globalWatermarkOpacity.value
   });
 }
@@ -683,6 +707,7 @@ function readCardSettings(card) {
     watermarkKind: card.querySelector(".card-watermark-kind").value,
     watermarkText: card.querySelector(".card-watermark").value,
     watermarkPosition: card.querySelector(".card-watermark-position").value,
+    watermarkScale: card.querySelector(".card-watermark-scale").value,
     watermarkOpacity: card.querySelector(".card-watermark-opacity").value
   });
 }
@@ -697,6 +722,12 @@ function normalizeSettings(settings) {
     watermarkKind: normalizeWatermarkKind(settings.watermarkKind),
     watermarkText: String(settings.watermarkText || "").trim().slice(0, 120),
     watermarkPosition: settings.watermarkPosition || DEFAULT_SETTINGS.watermarkPosition,
+    watermarkScale: clampNumber(
+      settings.watermarkScale,
+      DEFAULT_SETTINGS.watermarkScale,
+      5,
+      60
+    ),
     watermarkOpacity: clampNumber(
       settings.watermarkOpacity,
       DEFAULT_SETTINGS.watermarkOpacity,
@@ -825,6 +856,8 @@ function syncGlobalControls(settings) {
   globalWatermarkPosition.value = settings.watermarkPosition;
   globalWatermarkOpacity.value = settings.watermarkOpacity;
   globalWatermarkOpacityVal.textContent = `${settings.watermarkOpacity}%`;
+  globalWatermarkScale.value = settings.watermarkScale;
+  globalWatermarkScaleVal.textContent = `${settings.watermarkScale}%`;
   updateGlobalWatermarkImageUI();
   updateGlobalWatermarkMode();
 }
@@ -902,6 +935,7 @@ function updateCardWatermarkMode(card) {
   const imageClearButton = card.querySelector(".card-watermark-image-clear");
   const positionSelect = card.querySelector(".card-watermark-position");
   const opacityInput = card.querySelector(".card-watermark-opacity");
+  const scaleInput = card.querySelector(".card-watermark-scale");
 
   textInput.disabled = kind !== "text";
   textInput.classList.toggle("is-disabled", kind !== "text");
@@ -910,6 +944,7 @@ function updateCardWatermarkMode(card) {
   imageClearButton.disabled = kind !== "image" || !cards.get(card.dataset.id)?.watermarkImageFile;
   positionSelect.disabled = kind === "none";
   opacityInput.disabled = kind === "none";
+  scaleInput.disabled = kind === "none";
 }
 
 function updateGlobalWatermarkMode() {
@@ -923,6 +958,7 @@ function updateGlobalWatermarkMode() {
   clearGlobalWatermarkImageBtn.disabled = kind !== "image" || !globalWatermarkImage;
   globalWatermarkPosition.disabled = kind === "none";
   globalWatermarkOpacity.disabled = kind === "none";
+  globalWatermarkScale.disabled = kind === "none";
 }
 
 function buildConversionFormData(state, settings, assets = {}) {

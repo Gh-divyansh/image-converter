@@ -13,8 +13,8 @@ Image converter and compressor built with Express, `sharp`, and a static fronten
 - Drag cards to reorder the ZIP output sequence.
 - Resize with custom width and height controls.
 - Choose fit modes including contain, cover/crop, fill, inside, and outside.
-- Add an optional text watermark with adjustable opacity and position.
-- Add an optional image watermark with adjustable opacity and position.
+- Add an optional text watermark with adjustable opacity, position, and size.
+- Add an optional image watermark with adjustable opacity, position, and size.
 - Choose one watermark mode at a time: none, text, or image.
 - Save default output settings in the browser for the next session.
 

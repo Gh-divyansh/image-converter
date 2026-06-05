@@ -73,6 +73,7 @@ function parseOptions(payload = {}) {
     ? payload.watermarkKind
     : "text";
   const watermarkText = String(payload.watermarkText || "").trim().slice(0, 120);
+  const watermarkScale = clampInt(payload.watermarkScale, 24, 5, 60);
   const watermarkOpacity = clampInt(payload.watermarkOpacity, 18, 0, 100) / 100;
   const watermarkPosition = SUPPORTED_POSITIONS.has(payload.watermarkPosition)
     ? payload.watermarkPosition
@@ -86,6 +87,7 @@ function parseOptions(payload = {}) {
     fit,
     watermarkKind,
     watermarkText,
+    watermarkScale,
     watermarkOpacity,
     watermarkPosition
   };
@@ -198,6 +200,7 @@ async function convertImageBufferWithAssets(inputBuffer, options, assets = {}) {
       normalized.info.width,
       normalized.info.height,
       assets.watermarkImageBuffer,
+      options.watermarkScale,
       options.watermarkOpacity
     );
 
@@ -224,6 +227,7 @@ async function convertImageBufferWithAssets(inputBuffer, options, assets = {}) {
           normalized.info.width,
           normalized.info.height,
           options.watermarkText,
+          options.watermarkScale,
           options.watermarkOpacity
         ),
         gravity: options.watermarkPosition
@@ -242,9 +246,10 @@ async function convertImageBufferWithAssets(inputBuffer, options, assets = {}) {
   };
 }
 
-async function buildWatermarkImageSvg(baseWidth, baseHeight, watermarkBuffer, opacity) {
-  const maxWidth = Math.max(36, Math.min(420, Math.round(baseWidth * 0.24)));
-  const maxHeight = Math.max(36, Math.min(280, Math.round(baseHeight * 0.24)));
+async function buildWatermarkImageSvg(baseWidth, baseHeight, watermarkBuffer, scale, opacity) {
+  const normalizedScale = Math.max(5, Math.min(60, scale || 24)) / 100;
+  const maxWidth = Math.max(24, Math.min(720, Math.round(baseWidth * normalizedScale)));
+  const maxHeight = Math.max(24, Math.min(520, Math.round(baseHeight * normalizedScale)));
   const margin = Math.max(12, Math.round(Math.min(baseWidth, baseHeight) * 0.035));
   const watermark = sharp(watermarkBuffer, { failOn: "none" }).rotate().resize({
     width: maxWidth,
@@ -314,9 +319,13 @@ function applyFormat(image, format, quality) {
   }
 }
 
-function buildWatermarkSvg(width, height, text, opacity) {
+function buildWatermarkSvg(width, height, text, scale, opacity) {
   const safeText = escapeXml(text);
-  const fontSize = Math.max(16, Math.min(64, Math.round(Math.min(width, height) / 14)));
+  const normalizedScale = Math.max(5, Math.min(60, scale || 24)) / 100;
+  const fontSize = Math.max(
+    12,
+    Math.min(120, Math.round(Math.min(width, height) * normalizedScale * 0.42))
+  );
   const paddingX = Math.round(fontSize * 0.75);
   const paddingY = Math.round(fontSize * 0.55);
   const textWidth = Math.max(
