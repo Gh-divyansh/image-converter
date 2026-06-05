@@ -3,60 +3,119 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ImgCrush — Image Converter & Compressor</title>
+  <title>ImgCrush | Image Converter and Compressor</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
   <div class="container">
-
     <header class="header">
       <div class="logo">
-        <span class="logo-icon">⚡</span>
+        <span class="logo-icon">IC</span>
         <span class="logo-text">ImgCrush</span>
       </div>
-      <p class="tagline">Convert & compress images in seconds</p>
+      <p class="tagline">Convert, resize, watermark, and zip image batches in one place.</p>
     </header>
 
-    <div class="upload-box" id="uploadBox">
-      <input type="file" id="imageInput" multiple accept="image/*" hidden />
-      <div class="upload-inner">
-        <div class="upload-icon">🖼️</div>
-        <p class="upload-title">Drop images here</p>
-        <p class="upload-sub">or <span class="upload-link">browse files</span> — JPG, PNG, WEBP, AVIF, TIFF</p>
+    <section class="source-panel">
+      <div class="upload-box" id="uploadBox">
+        <input type="file" id="imageInput" multiple accept="image/*" hidden />
+        <div class="upload-inner">
+          <div class="upload-icon">Drop</div>
+          <p class="upload-title">Drop images, browse files, or paste screenshots</p>
+          <p class="upload-sub">Supports JPG, PNG, WEBP, AVIF, TIFF, and pasted clipboard images up to 20MB each.</p>
+        </div>
       </div>
-    </div>
 
-    <!-- Global controls bar -->
-    <div class="global-bar" id="globalBar">
-      <div class="global-controls">
-        <label class="global-label">All as</label>
-        <select id="globalFormat" class="global-select">
-          <option value="">— keep each —</option>
-          <option value="webp">WEBP</option>
-          <option value="avif">AVIF</option>
-          <option value="jpeg">JPEG</option>
-          <option value="png">PNG</option>
-          <option value="tiff">TIFF</option>
-        </select>
-        <label class="global-label">Quality</label>
-        <input type="range" id="globalQuality" class="global-range" min="1" max="100" value="80" />
-        <span id="globalQualityVal" class="quality-num">80</span>
+      <div class="link-panel">
+        <p class="panel-label">Import from link</p>
+        <div class="link-row">
+          <input
+            type="url"
+            id="imageUrlInput"
+            class="url-input"
+            placeholder="https://example.com/image.jpg"
+          />
+          <button id="addUrlBtn" class="secondary-btn" type="button">Add Link</button>
+        </div>
+        <p class="panel-note">Tip: paste an image URL anywhere on the page and it will be added automatically.</p>
       </div>
-      <button id="convertAllBtn" class="convert-all-btn">
-        ⚡ Convert All
-      </button>
-    </div>
+    </section>
+
+    <section class="global-bar" id="globalBar">
+      <div class="global-head">
+        <div>
+          <h2>Defaults and batch controls</h2>
+          <p>New cards inherit these settings, and changing them updates every card.</p>
+        </div>
+        <button id="convertAllBtn" class="convert-all-btn" type="button">Convert All to ZIP</button>
+      </div>
+
+      <div class="global-grid">
+        <label class="field">
+          <span>Format</span>
+          <select id="globalFormat" class="global-select">
+            <option value="webp">WEBP</option>
+            <option value="avif">AVIF</option>
+            <option value="jpeg">JPEG</option>
+            <option value="png">PNG</option>
+            <option value="tiff">TIFF</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Quality</span>
+          <div class="range-field">
+            <input type="range" id="globalQuality" min="1" max="100" value="80" />
+            <strong id="globalQualityVal" class="range-value">80</strong>
+          </div>
+        </label>
+
+        <label class="field">
+          <span>Width</span>
+          <input type="number" id="globalWidth" min="1" max="8000" placeholder="Auto" />
+        </label>
+
+        <label class="field">
+          <span>Height</span>
+          <input type="number" id="globalHeight" min="1" max="8000" placeholder="Auto" />
+        </label>
+
+        <label class="field">
+          <span>Fit</span>
+          <select id="globalFit" class="global-select">
+            <option value="inside">Inside</option>
+            <option value="contain">Contain</option>
+            <option value="cover">Cover / Crop</option>
+            <option value="fill">Fill</option>
+            <option value="outside">Outside</option>
+          </select>
+        </label>
+
+        <label class="field field-wide">
+          <span>Watermark text</span>
+          <input type="text" id="globalWatermark" maxlength="120" placeholder="Optional text watermark" />
+        </label>
+
+        <label class="field">
+          <span>Watermark opacity</span>
+          <div class="range-field">
+            <input type="range" id="globalWatermarkOpacity" min="0" max="100" value="18" />
+            <strong id="globalWatermarkOpacityVal" class="range-value">18%</strong>
+          </div>
+        </label>
+      </div>
+
+      <p class="batch-status" id="batchStatus">Drop files, paste screenshots, or add image links to begin.</p>
+    </section>
 
     <div class="images-container" id="imagesContainer"></div>
 
     <div class="empty-state" id="emptyState">
-      <p>No images yet — add some above!</p>
+      <p>No images yet. Start with a file, pasted screenshot, or direct image link.</p>
     </div>
-
   </div>
 
   <script src="app.js"></script>

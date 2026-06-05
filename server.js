@@ -3,6 +3,7 @@ const cors = require("cors");
 const path = require("path");
 
 const convertHandler = require("./api/convert");
+const convertAllHandler = require("./api/convert-all");
 
 const app = express();
 
@@ -12,6 +13,10 @@ app.use(express.static(path.join(__dirname, "public")));
 
 app.post("/convert", (req, res) => {
   return convertHandler(req, res);
+});
+
+app.post("/convert-all", (req, res) => {
+  return convertAllHandler(req, res);
 });
 
 app.get("*", (req, res) => {

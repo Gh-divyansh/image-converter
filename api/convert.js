@@ -1,45 +1,15 @@
-const multer = require("multer");
-const sharp = require("sharp");
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-
-  // 20MB limit
-  limits: { fileSize: 20 * 1024 * 1024 },
-
-  fileFilter: (req, file, cb) => {
-    if (!file.mimetype.startsWith("image/")) {
-      return cb(new Error("Only image files allowed"));
-    }
-
-    cb(null, true);
-  }
-});
-
-const MIME = {
-  jpeg: "image/jpeg",
-  png:  "image/png",
-  webp: "image/webp",
-  avif: "image/avif",
-  tiff: "image/tiff"
-};
-
-const supportedFormats = Object.keys(MIME);
-
-function runMiddleware(req, res, fn) {
-  return new Promise((resolve, reject) => {
-    fn(req, res, result => {
-      if (result instanceof Error) {
-        return reject(result);
-      }
-
-      resolve(result);
-    });
-  });
-}
+const {
+  MIME,
+  buildOutputName,
+  convertImageBuffer,
+  formatBytes,
+  getSourceBuffer,
+  parseOptions,
+  runMiddleware,
+  uploadSingle
+} = require("./convert-core");
 
 module.exports = async (req, res) => {
-
   if (req.method !== "POST") {
     return res.status(405).json({
       success: false,
@@ -48,121 +18,38 @@ module.exports = async (req, res) => {
   }
 
   try {
+    await runMiddleware(req, res, uploadSingle);
 
-    await runMiddleware(
-      req,
-      res,
-      upload.single("image")
-    );
-
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: "No image uploaded"
-      });
-    }
-
-    const targetFormat = req.body.format;
-
-    const quality = Math.min(
-      100,
-      Math.max(
-        1,
-        parseInt(req.body.quality) || 80
-      )
-    );
-
-    if (!supportedFormats.includes(targetFormat)) {
-      return res.status(400).json({
-        success: false,
-        message: "Unsupported format"
-      });
-    }
-
-    const originalSize = req.file.size;
-
-    const ext =
-      targetFormat === "jpeg"
-        ? "jpg"
-        : targetFormat;
-
-    let image = sharp(req.file.buffer);
-
-    image = image.rotate();
-
-    image = image.resize({
-      width: 3500,
-      withoutEnlargement: true
+    const options = parseOptions(req.body);
+    const source = await getSourceBuffer({
+      file: req.file,
+      imageUrl: req.body.imageUrl
     });
-
-    switch (targetFormat) {
-
-      case "webp":
-        image = image.webp({
-          quality,
-          effort: 6
-        });
-        break;
-
-      case "avif":
-        image = image.avif({
-          quality,
-          effort: 5
-        });
-        break;
-
-      case "jpeg":
-        image = image.jpeg({
-          quality,
-          mozjpeg: true
-        });
-        break;
-
-      case "png":
-        image = image.png({
-          compressionLevel: 9,
-          quality
-        });
-        break;
-
-      case "tiff":
-        image = image.tiff({
-          quality,
-          compression: "lzw"
-        });
-        break;
-
-    }
-
-    const buffer = await image.toBuffer();
-
-    const convertedSize = buffer.length;
-
-    const savedBytes =
-      originalSize - convertedSize;
+    const result = await convertImageBuffer(source.buffer, options);
+    const savedBytes = result.originalSize - result.convertedSize;
 
     const savedPercent = (
-      (savedBytes / originalSize) * 100
+      (savedBytes / result.originalSize) * 100
     ).toFixed(1);
 
     res.setHeader(
       "Content-Type",
-      MIME[targetFormat]
+      MIME[options.format]
     );
 
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="converted.${ext}"`
+      `attachment; filename="${buildOutputName(source.sourceName, options.format)}"`
     );
 
     res.setHeader(
       "X-Original-Size",
-      formatBytes(originalSize)
+      formatBytes(result.originalSize)
     );
 
     res.setHeader(
       "X-Converted-Size",
-      formatBytes(convertedSize)
+      formatBytes(result.convertedSize)
     );
 
     res.setHeader(
@@ -185,10 +72,8 @@ module.exports = async (req, res) => {
       "X-Original-Size,X-Converted-Size,X-Saved-Bytes,X-Saved-Percent,X-Grew"
     );
 
-    return res.send(buffer);
-
+    return res.send(result.buffer);
   } catch (error) {
-
     console.error(error);
 
     if (error.code === "LIMIT_FILE_SIZE") {
@@ -204,31 +89,3 @@ module.exports = async (req, res) => {
     });
   }
 };
-
-function formatBytes(bytes) {
-
-  if (bytes === 0) {
-    return "0 B";
-  }
-
-  const k = 1024;
-
-  const sizes = [
-    "B",
-    "KB",
-    "MB",
-    "GB"
-  ];
-
-  const i = Math.floor(
-    Math.log(bytes) / Math.log(k)
-  );
-
-  return (
-    parseFloat(
-      (bytes / Math.pow(k, i)).toFixed(1)
-    ) +
-    " " +
-    sizes[i]
-  );
-}
