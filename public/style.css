@@ -330,6 +330,11 @@ select {
   background: var(--surface-soft);
 }
 
+.watermark-file-row-card .secondary-btn,
+.watermark-file-row-card .ghost-btn {
+  flex-shrink: 0;
+}
+
 .watermark-file-meta,
 .watermark-image-status {
   flex: 1;

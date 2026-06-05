@@ -278,9 +278,14 @@ function createImageCard(source) {
         </label>
         <div class="field field-wide">
           <span>Watermark image</span>
-          <div class="watermark-image-status">
-            <strong class="card-watermark-image-label">No image selected</strong>
-            <span>Controlled from the global watermark image picker.</span>
+          <div class="watermark-file-row watermark-file-row-card">
+            <input type="file" class="card-watermark-image-input" accept="image/*" hidden />
+            <button class="card-watermark-image-btn secondary-btn" type="button">Choose Image</button>
+            <button class="card-watermark-image-clear ghost-btn" type="button">Clear</button>
+            <div class="watermark-file-meta watermark-image-status">
+              <strong class="card-watermark-image-label">No image selected</strong>
+              <span>Specific to this card only.</span>
+            </div>
           </div>
         </div>
         <label class="field">
@@ -344,6 +349,9 @@ function wireCard(card) {
   const opacityInput = card.querySelector(".card-watermark-opacity");
   const opacityValue = card.querySelector(".watermark-value");
   const watermarkKindSelect = card.querySelector(".card-watermark-kind");
+  const watermarkImageInput = card.querySelector(".card-watermark-image-input");
+  const watermarkImageBtn = card.querySelector(".card-watermark-image-btn");
+  const watermarkImageClearBtn = card.querySelector(".card-watermark-image-clear");
   const dragHandle = card.querySelector(".drag-handle");
 
   qualityInput.addEventListener("input", () => {
@@ -356,6 +364,20 @@ function wireCard(card) {
 
   watermarkKindSelect.addEventListener("change", () => {
     updateCardWatermarkMode(card);
+  });
+
+  watermarkImageBtn.addEventListener("click", () => {
+    watermarkImageInput.click();
+  });
+
+  watermarkImageInput.addEventListener("change", event => {
+    const file = event.target.files?.[0] || null;
+    setCardWatermarkImage(card, file);
+    watermarkImageInput.value = "";
+  });
+
+  watermarkImageClearBtn.addEventListener("click", () => {
+    setCardWatermarkImage(card, null);
   });
 
   card.querySelector(".remove-btn").addEventListener("click", () => {
@@ -621,11 +643,6 @@ function applyGlobalWatermarkImage(file) {
     : null;
 
   updateGlobalWatermarkImageUI();
-
-  imagesContainer.querySelectorAll(".image-card").forEach(card => {
-    syncCardWatermarkImage(card, globalWatermarkImage);
-    updateCardWatermarkMode(card);
-  });
 }
 
 function populateCardSettings(card, settings) {
@@ -834,9 +851,14 @@ function syncCardWatermarkImage(card, watermarkImageState) {
   state.watermarkImageName = watermarkImageState?.file?.name || "";
 
   const label = card.querySelector(".card-watermark-image-label");
+  const clearButton = card.querySelector(".card-watermark-image-clear");
 
   if (label) {
     label.textContent = state.watermarkImageName || "No image selected";
+  }
+
+  if (clearButton) {
+    clearButton.disabled = !state.watermarkImageFile;
   }
 }
 
@@ -846,18 +868,46 @@ function updateGlobalWatermarkImageUI() {
   updateGlobalWatermarkMode();
 }
 
+function setCardWatermarkImage(card, file) {
+  if (file && !file.type.startsWith("image/")) {
+    window.alert("Watermark image must be an image file.");
+    return;
+  }
+
+  if (file && file.size > MAX_FILE_SIZE) {
+    window.alert("Watermark image exceeds the 20MB upload limit.");
+    return;
+  }
+
+  syncCardWatermarkImage(
+    card,
+    file
+      ? {
+          file,
+          key: `wm_${++globalWatermarkImageCount}`
+        }
+      : null
+  );
+
+  updateCardWatermarkMode(card);
+}
+
 function updateCardWatermarkMode(card) {
   const kind = normalizeWatermarkKind(
     card.querySelector(".card-watermark-kind").value
   );
   const textInput = card.querySelector(".card-watermark");
   const imageStatus = card.querySelector(".watermark-image-status");
+  const imageButton = card.querySelector(".card-watermark-image-btn");
+  const imageClearButton = card.querySelector(".card-watermark-image-clear");
   const positionSelect = card.querySelector(".card-watermark-position");
   const opacityInput = card.querySelector(".card-watermark-opacity");
 
   textInput.disabled = kind !== "text";
   textInput.classList.toggle("is-disabled", kind !== "text");
   imageStatus.classList.toggle("is-disabled", kind !== "image");
+  imageButton.disabled = kind !== "image";
+  imageClearButton.disabled = kind !== "image" || !cards.get(card.dataset.id)?.watermarkImageFile;
   positionSelect.disabled = kind === "none";
   opacityInput.disabled = kind === "none";
 }
