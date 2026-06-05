@@ -674,3 +674,7 @@ select {
     font-size: 24px;
   }
 }
+
+.preview-wrap:has(:not(.preview)) .preview-fallback{
+    display:none;
+}
