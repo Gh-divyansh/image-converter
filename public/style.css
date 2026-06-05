@@ -354,6 +354,10 @@ select {
   color: var(--muted);
 }
 
+.is-disabled {
+  opacity: 0.48;
+}
+
 .batch-status {
   margin: 0;
 }
@@ -725,7 +729,6 @@ select {
     font-size: 24px;
   }
 }
-
 .preview-wrap:has(:not(.preview)) .preview-fallback{
     display:none;
 }

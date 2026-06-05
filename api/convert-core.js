@@ -20,6 +20,11 @@ const SUPPORTED_POSITIONS = new Set([
   "west",
   "northwest"
 ]);
+const SUPPORTED_WATERMARK_KINDS = new Set([
+  "none",
+  "text",
+  "image"
+]);
 
 const MIME = {
   jpeg: "image/jpeg",
@@ -64,6 +69,9 @@ function parseOptions(payload = {}) {
   const width = parseDimension(payload.width);
   const height = parseDimension(payload.height);
   const fit = SUPPORTED_FITS.has(payload.fit) ? payload.fit : "inside";
+  const watermarkKind = SUPPORTED_WATERMARK_KINDS.has(payload.watermarkKind)
+    ? payload.watermarkKind
+    : "text";
   const watermarkText = String(payload.watermarkText || "").trim().slice(0, 120);
   const watermarkOpacity = clampInt(payload.watermarkOpacity, 18, 0, 100) / 100;
   const watermarkPosition = SUPPORTED_POSITIONS.has(payload.watermarkPosition)
@@ -76,6 +84,7 @@ function parseOptions(payload = {}) {
     width,
     height,
     fit,
+    watermarkKind,
     watermarkText,
     watermarkOpacity,
     watermarkPosition
@@ -179,6 +188,7 @@ async function convertImageBufferWithAssets(inputBuffer, options, assets = {}) {
   let output = sharp(normalized.data, { failOn: "none" });
 
   if (
+    options.watermarkKind === "image" &&
     assets.watermarkImageBuffer &&
     options.watermarkOpacity > 0 &&
     normalized.info.width >= 48 &&
@@ -202,6 +212,7 @@ async function convertImageBufferWithAssets(inputBuffer, options, assets = {}) {
   }
 
   if (
+    options.watermarkKind === "text" &&
     options.watermarkText &&
     options.watermarkOpacity > 0 &&
     normalized.info.width >= 48 &&

@@ -6,6 +6,7 @@ const DEFAULT_SETTINGS = {
   width: 3500,
   height: "",
   fit: "inside",
+  watermarkKind: "text",
   watermarkText: "",
   watermarkPosition: "southeast",
   watermarkOpacity: 18
@@ -23,6 +24,7 @@ const globalQualityVal = document.getElementById("globalQualityVal");
 const globalWidth = document.getElementById("globalWidth");
 const globalHeight = document.getElementById("globalHeight");
 const globalFit = document.getElementById("globalFit");
+const globalWatermarkKind = document.getElementById("globalWatermarkKind");
 const globalWatermark = document.getElementById("globalWatermark");
 const globalWatermarkImageInput = document.getElementById("globalWatermarkImageInput");
 const globalWatermarkImageBtn = document.getElementById("globalWatermarkImageBtn");
@@ -138,6 +140,7 @@ function wireEvents() {
     globalWidth,
     globalHeight,
     globalFit,
+    globalWatermarkKind,
     globalWatermark,
     globalWatermarkPosition
   ].forEach(element => {
@@ -262,6 +265,14 @@ function createImageCard(source) {
           </select>
         </label>
         <label class="field field-wide">
+          <span>Watermark type</span>
+          <select class="card-watermark-kind">
+            <option value="none">None</option>
+            <option value="text">Text</option>
+            <option value="image">Image</option>
+          </select>
+        </label>
+        <label class="field field-wide">
           <span>Watermark text</span>
           <input type="text" class="card-watermark" maxlength="120" placeholder="Optional text watermark" />
         </label>
@@ -319,6 +330,7 @@ function createImageCard(source) {
 
   populateCardSettings(card, settings);
   syncCardWatermarkImage(card, globalWatermarkImage);
+  updateCardWatermarkMode(card);
   wireCard(card);
   hydratePreview(card, source.previewUrl);
   imagesContainer.appendChild(card);
@@ -331,6 +343,7 @@ function wireCard(card) {
   const qualityValue = card.querySelector(".range-value");
   const opacityInput = card.querySelector(".card-watermark-opacity");
   const opacityValue = card.querySelector(".watermark-value");
+  const watermarkKindSelect = card.querySelector(".card-watermark-kind");
   const dragHandle = card.querySelector(".drag-handle");
 
   qualityInput.addEventListener("input", () => {
@@ -339,6 +352,10 @@ function wireCard(card) {
 
   opacityInput.addEventListener("input", () => {
     opacityValue.textContent = `${opacityInput.value}%`;
+  });
+
+  watermarkKindSelect.addEventListener("change", () => {
+    updateCardWatermarkMode(card);
   });
 
   card.querySelector(".remove-btn").addEventListener("click", () => {
@@ -576,10 +593,12 @@ async function convertAllCardsToZip() {
 
 function applyGlobalSettings() {
   const settings = readGlobalSettings();
+  updateGlobalWatermarkMode();
   saveDefaults(settings);
 
   imagesContainer.querySelectorAll(".image-card").forEach(card => {
     populateCardSettings(card, settings);
+    updateCardWatermarkMode(card);
   });
 }
 
@@ -605,6 +624,7 @@ function applyGlobalWatermarkImage(file) {
 
   imagesContainer.querySelectorAll(".image-card").forEach(card => {
     syncCardWatermarkImage(card, globalWatermarkImage);
+    updateCardWatermarkMode(card);
   });
 }
 
@@ -615,6 +635,7 @@ function populateCardSettings(card, settings) {
   card.querySelector(".card-width").value = settings.width;
   card.querySelector(".card-height").value = settings.height;
   card.querySelector(".card-fit").value = settings.fit;
+  card.querySelector(".card-watermark-kind").value = settings.watermarkKind;
   card.querySelector(".card-watermark").value = settings.watermarkText;
   card.querySelector(".card-watermark-position").value = settings.watermarkPosition;
   card.querySelector(".card-watermark-opacity").value = settings.watermarkOpacity;
@@ -628,6 +649,7 @@ function readGlobalSettings() {
     width: globalWidth.value,
     height: globalHeight.value,
     fit: globalFit.value,
+    watermarkKind: globalWatermarkKind.value,
     watermarkText: globalWatermark.value,
     watermarkPosition: globalWatermarkPosition.value,
     watermarkOpacity: globalWatermarkOpacity.value
@@ -641,6 +663,7 @@ function readCardSettings(card) {
     width: card.querySelector(".card-width").value,
     height: card.querySelector(".card-height").value,
     fit: card.querySelector(".card-fit").value,
+    watermarkKind: card.querySelector(".card-watermark-kind").value,
     watermarkText: card.querySelector(".card-watermark").value,
     watermarkPosition: card.querySelector(".card-watermark-position").value,
     watermarkOpacity: card.querySelector(".card-watermark-opacity").value
@@ -654,6 +677,7 @@ function normalizeSettings(settings) {
     width: normalizeDimension(settings.width),
     height: normalizeDimension(settings.height),
     fit: settings.fit || DEFAULT_SETTINGS.fit,
+    watermarkKind: normalizeWatermarkKind(settings.watermarkKind),
     watermarkText: String(settings.watermarkText || "").trim().slice(0, 120),
     watermarkPosition: settings.watermarkPosition || DEFAULT_SETTINGS.watermarkPosition,
     watermarkOpacity: clampNumber(
@@ -777,11 +801,13 @@ function syncGlobalControls(settings) {
   globalWidth.value = settings.width;
   globalHeight.value = settings.height;
   globalFit.value = settings.fit;
+  globalWatermarkKind.value = settings.watermarkKind;
   globalWatermark.value = settings.watermarkText;
   globalWatermarkPosition.value = settings.watermarkPosition;
   globalWatermarkOpacity.value = settings.watermarkOpacity;
   globalWatermarkOpacityVal.textContent = `${settings.watermarkOpacity}%`;
   updateGlobalWatermarkImageUI();
+  updateGlobalWatermarkMode();
 }
 
 function releaseCardResources(state) {
@@ -815,6 +841,34 @@ function syncCardWatermarkImage(card, watermarkImageState) {
 function updateGlobalWatermarkImageUI() {
   globalWatermarkImageName.textContent = globalWatermarkImage?.file?.name || "No image selected";
   clearGlobalWatermarkImageBtn.disabled = !globalWatermarkImage;
+  updateGlobalWatermarkMode();
+}
+
+function updateCardWatermarkMode(card) {
+  const kind = normalizeWatermarkKind(
+    card.querySelector(".card-watermark-kind").value
+  );
+  const textInput = card.querySelector(".card-watermark");
+  const imageStatus = card.querySelector(".watermark-image-status");
+  const positionSelect = card.querySelector(".card-watermark-position");
+  const opacityInput = card.querySelector(".card-watermark-opacity");
+
+  textInput.disabled = kind !== "text";
+  textInput.classList.toggle("is-disabled", kind !== "text");
+  imageStatus.classList.toggle("is-disabled", kind !== "image");
+  positionSelect.disabled = kind === "none";
+  opacityInput.disabled = kind === "none";
+}
+
+function updateGlobalWatermarkMode() {
+  const kind = normalizeWatermarkKind(globalWatermarkKind.value);
+
+  globalWatermark.disabled = kind !== "text";
+  globalWatermark.classList.toggle("is-disabled", kind !== "text");
+  globalWatermarkImageBtn.disabled = kind !== "image";
+  clearGlobalWatermarkImageBtn.disabled = kind !== "image" || !globalWatermarkImage;
+  globalWatermarkPosition.disabled = kind === "none";
+  globalWatermarkOpacity.disabled = kind === "none";
 }
 
 function buildConversionFormData(state, settings, assets = {}) {
@@ -1057,6 +1111,12 @@ function normalizeDimension(value) {
   }
 
   return Math.min(parsed, 8000);
+}
+
+function normalizeWatermarkKind(value) {
+  return ["none", "text", "image"].includes(value)
+    ? value
+    : DEFAULT_SETTINGS.watermarkKind;
 }
 
 function clampNumber(value, fallback, min, max) {

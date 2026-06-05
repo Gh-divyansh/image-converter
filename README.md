@@ -15,6 +15,7 @@ Image converter and compressor built with Express, `sharp`, and a static fronten
 - Choose fit modes including contain, cover/crop, fill, inside, and outside.
 - Add an optional text watermark with adjustable opacity and position.
 - Add an optional image watermark with adjustable opacity and position.
+- Choose one watermark mode at a time: none, text, or image.
 - Save default output settings in the browser for the next session.
 
 ## Run locally
