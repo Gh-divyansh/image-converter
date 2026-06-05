@@ -143,7 +143,7 @@ function wireEvents() {
     globalWatermarkKind,
     globalWatermark,
     globalWatermarkPosition
-  ].forEach(element => {
+  ].filter(Boolean).forEach(element => {
     element.addEventListener("input", applyGlobalSettings);
     element.addEventListener("change", applyGlobalSettings);
   });
@@ -649,7 +649,7 @@ function readGlobalSettings() {
     width: globalWidth.value,
     height: globalHeight.value,
     fit: globalFit.value,
-    watermarkKind: globalWatermarkKind.value,
+    watermarkKind: globalWatermarkKind?.value || DEFAULT_SETTINGS.watermarkKind,
     watermarkText: globalWatermark.value,
     watermarkPosition: globalWatermarkPosition.value,
     watermarkOpacity: globalWatermarkOpacity.value
@@ -801,7 +801,9 @@ function syncGlobalControls(settings) {
   globalWidth.value = settings.width;
   globalHeight.value = settings.height;
   globalFit.value = settings.fit;
-  globalWatermarkKind.value = settings.watermarkKind;
+  if (globalWatermarkKind) {
+    globalWatermarkKind.value = settings.watermarkKind;
+  }
   globalWatermark.value = settings.watermarkText;
   globalWatermarkPosition.value = settings.watermarkPosition;
   globalWatermarkOpacity.value = settings.watermarkOpacity;
@@ -861,7 +863,9 @@ function updateCardWatermarkMode(card) {
 }
 
 function updateGlobalWatermarkMode() {
-  const kind = normalizeWatermarkKind(globalWatermarkKind.value);
+  const kind = normalizeWatermarkKind(
+    globalWatermarkKind?.value || DEFAULT_SETTINGS.watermarkKind
+  );
 
   globalWatermark.disabled = kind !== "text";
   globalWatermark.classList.toggle("is-disabled", kind !== "text");
