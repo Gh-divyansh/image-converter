@@ -7,6 +7,7 @@ const DEFAULT_SETTINGS = {
   height: "",
   fit: "inside",
   watermarkText: "",
+  watermarkPosition: "southeast",
   watermarkOpacity: 18
 };
 
@@ -23,13 +24,20 @@ const globalWidth = document.getElementById("globalWidth");
 const globalHeight = document.getElementById("globalHeight");
 const globalFit = document.getElementById("globalFit");
 const globalWatermark = document.getElementById("globalWatermark");
+const globalWatermarkPosition = document.getElementById("globalWatermarkPosition");
 const globalWatermarkOpacity = document.getElementById("globalWatermarkOpacity");
 const globalWatermarkOpacityVal = document.getElementById("globalWatermarkOpacityVal");
 const convertAllBtn = document.getElementById("convertAllBtn");
+const batchProgress = document.getElementById("batchProgress");
+const batchProgressFill = document.getElementById("batchProgressFill");
 const batchStatus = document.getElementById("batchStatus");
 const emptyState = document.getElementById("emptyState");
 
 const cards = new Map();
+const dragState = {
+  activeId: null,
+  armedId: null
+};
 let cardCount = 0;
 let pastedImageCount = 0;
 
@@ -110,13 +118,16 @@ function wireEvents() {
     globalWidth,
     globalHeight,
     globalFit,
-    globalWatermark
+    globalWatermark,
+    globalWatermarkPosition
   ].forEach(element => {
     element.addEventListener("input", applyGlobalSettings);
     element.addEventListener("change", applyGlobalSettings);
   });
 
   convertAllBtn.addEventListener("click", convertAllCardsToZip);
+  imagesContainer.addEventListener("dragover", handleCardDragOver);
+  imagesContainer.addEventListener("drop", event => event.preventDefault());
 }
 
 function handleFiles(files) {
@@ -181,8 +192,10 @@ function createImageCard(source) {
 
   card.className = "image-card";
   card.dataset.id = id;
+  card.draggable = true;
 
   card.innerHTML = `
+    <button class="drag-handle" type="button" title="Drag to reorder">Drag</button>
     <button class="remove-btn" type="button" title="Remove image">x</button>
     <div class="preview-wrap">
       <img class="preview" alt="${escapeHtml(source.displayName)} preview" />
@@ -233,6 +246,18 @@ function createImageCard(source) {
           <input type="text" class="card-watermark" maxlength="120" placeholder="Optional text watermark" />
         </label>
         <label class="field">
+          <span>Watermark position</span>
+          <select class="card-watermark-position">
+            <option value="southeast">Bottom right</option>
+            <option value="southwest">Bottom left</option>
+            <option value="northeast">Top right</option>
+            <option value="northwest">Top left</option>
+            <option value="south">Bottom center</option>
+            <option value="north">Top center</option>
+            <option value="center">Center</option>
+          </select>
+        </label>
+        <label class="field">
           <span>Watermark opacity</span>
           <div class="range-field">
             <input type="range" class="card-watermark-opacity" min="0" max="100" />
@@ -242,6 +267,7 @@ function createImageCard(source) {
       </div>
       <div class="button-row">
         <button class="convert-btn" type="button">Convert</button>
+        <button class="copy-btn" type="button">Copy Image</button>
         <a class="download-btn" download>Download</a>
       </div>
       <div class="stats"></div>
@@ -255,7 +281,9 @@ function createImageCard(source) {
   cards.set(id, {
     id,
     ...source,
-    downloadUrl: null
+    downloadUrl: null,
+    lastConvertedBlob: null,
+    lastConvertedSettings: null
   });
 
   populateCardSettings(card, settings);
@@ -271,6 +299,7 @@ function wireCard(card) {
   const qualityValue = card.querySelector(".range-value");
   const opacityInput = card.querySelector(".card-watermark-opacity");
   const opacityValue = card.querySelector(".watermark-value");
+  const dragHandle = card.querySelector(".drag-handle");
 
   qualityInput.addEventListener("input", () => {
     qualityValue.textContent = qualityInput.value;
@@ -292,6 +321,38 @@ function wireCard(card) {
 
   card.querySelector(".convert-btn").addEventListener("click", () => {
     convertCard(card);
+  });
+
+  card.querySelector(".copy-btn").addEventListener("click", () => {
+    copyConvertedImage(card);
+  });
+
+  dragHandle.addEventListener("pointerdown", () => {
+    dragState.armedId = id;
+  });
+
+  dragHandle.addEventListener("pointerup", () => {
+    if (dragState.activeId !== id) {
+      dragState.armedId = null;
+    }
+  });
+
+  card.addEventListener("dragstart", event => {
+    if (dragState.armedId !== id) {
+      event.preventDefault();
+      return;
+    }
+
+    dragState.activeId = id;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", id);
+    card.classList.add("dragging");
+  });
+
+  card.addEventListener("dragend", () => {
+    card.classList.remove("dragging");
+    dragState.activeId = null;
+    dragState.armedId = null;
   });
 }
 
@@ -327,15 +388,7 @@ async function convertCard(card) {
     isLoading: true
   });
 
-  const formData = new FormData();
-
-  if (state.sourceType === "file") {
-    formData.append("image", state.file);
-  } else {
-    formData.append("imageUrl", state.imageUrl);
-  }
-
-  appendSettings(formData, settings);
+  const formData = buildConversionFormData(state, settings);
 
   try {
     const response = await fetch("/convert", {
@@ -360,9 +413,12 @@ async function convertCard(card) {
     }
 
     state.downloadUrl = blobUrl;
+    state.lastConvertedBlob = blob;
+    state.lastConvertedSettings = settings;
     downloadBtn.href = blobUrl;
     downloadBtn.download = `${originalBaseName}_converted.${extension}`;
     downloadBtn.style.display = "inline-flex";
+    toggleCopyButton(card, true);
 
     renderCardStats(card, response.headers);
     card.classList.add("card-success");
@@ -389,13 +445,16 @@ async function convertAllCardsToZip() {
 
   convertAllBtn.disabled = true;
   convertAllBtn.textContent = "Building ZIP...";
-  showBatchStatus("Preparing batch conversion...");
+  setBatchProgress({
+    percent: 4,
+    message: "Preparing batch conversion..."
+  });
 
   const formData = new FormData();
   const metadata = [];
   let fileIndex = 0;
 
-  for (const card of cardElements) {
+  for (const [index, card] of cardElements.entries()) {
     const state = cards.get(card.dataset.id);
     const settings = readCardSettings(card);
     const item = {
@@ -414,24 +473,37 @@ async function convertAllCardsToZip() {
     }
 
     metadata.push(item);
+    setBatchProgress({
+      percent: 8 + Math.round(((index + 1) / cardElements.length) * 16),
+      message: `Prepared ${index + 1} of ${cardElements.length} images...`
+    });
   }
 
   formData.append("metadata", JSON.stringify(metadata));
 
   try {
-    const response = await fetch("/convert-all", {
-      method: "POST",
-      body: formData
+    const blob = await sendBatchRequest(formData, {
+      onUploadProgress(progress) {
+        setBatchProgress({
+          percent: 24 + Math.round(progress * 38),
+          message: `Uploading ${metadata.length} image${metadata.length > 1 ? "s" : ""}...`
+        });
+      },
+      onServerWork() {
+        setBatchProgress({
+          percent: 74,
+          message: "Converting images and building ZIP...",
+          indeterminate: true
+        });
+      },
+      onDownloadProgress(progress) {
+        setBatchProgress({
+          percent: 82 + Math.round(progress * 16),
+          message: "Downloading ZIP...",
+          indeterminate: false
+        });
+      }
     });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({
-        message: "Batch conversion failed"
-      }));
-      throw new Error(error.message);
-    }
-
-    const blob = await response.blob();
     const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement("a");
 
@@ -442,9 +514,16 @@ async function convertAllCardsToZip() {
     link.remove();
     setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 
-    showBatchStatus(`ZIP downloaded for ${metadata.length} image${metadata.length > 1 ? "s" : ""}.`, false);
+    setBatchProgress({
+      percent: 100,
+      message: `ZIP downloaded for ${metadata.length} image${metadata.length > 1 ? "s" : ""}.`
+    });
   } catch (error) {
-    showBatchStatus(error.message || "Batch conversion failed.", true);
+    setBatchProgress({
+      percent: 0,
+      message: error.message || "Batch conversion failed.",
+      isError: true
+    });
   } finally {
     convertAllBtn.disabled = false;
     convertAllBtn.textContent = "Convert All to ZIP";
@@ -468,6 +547,7 @@ function populateCardSettings(card, settings) {
   card.querySelector(".card-height").value = settings.height;
   card.querySelector(".card-fit").value = settings.fit;
   card.querySelector(".card-watermark").value = settings.watermarkText;
+  card.querySelector(".card-watermark-position").value = settings.watermarkPosition;
   card.querySelector(".card-watermark-opacity").value = settings.watermarkOpacity;
   card.querySelector(".watermark-value").textContent = `${settings.watermarkOpacity}%`;
 }
@@ -480,6 +560,7 @@ function readGlobalSettings() {
     height: globalHeight.value,
     fit: globalFit.value,
     watermarkText: globalWatermark.value,
+    watermarkPosition: globalWatermarkPosition.value,
     watermarkOpacity: globalWatermarkOpacity.value
   });
 }
@@ -492,6 +573,7 @@ function readCardSettings(card) {
     height: card.querySelector(".card-height").value,
     fit: card.querySelector(".card-fit").value,
     watermarkText: card.querySelector(".card-watermark").value,
+    watermarkPosition: card.querySelector(".card-watermark-position").value,
     watermarkOpacity: card.querySelector(".card-watermark-opacity").value
   });
 }
@@ -504,6 +586,7 @@ function normalizeSettings(settings) {
     height: normalizeDimension(settings.height),
     fit: settings.fit || DEFAULT_SETTINGS.fit,
     watermarkText: String(settings.watermarkText || "").trim().slice(0, 120),
+    watermarkPosition: settings.watermarkPosition || DEFAULT_SETTINGS.watermarkPosition,
     watermarkOpacity: clampNumber(
       settings.watermarkOpacity,
       DEFAULT_SETTINGS.watermarkOpacity,
@@ -548,10 +631,13 @@ function renderCardStats(card, headers) {
 }
 
 function setCardLoadingState({ card, convertBtn, downloadBtn, loader, stats, isLoading }) {
+  const copyBtn = card.querySelector(".copy-btn");
+
   if (isLoading) {
     convertBtn.disabled = true;
     convertBtn.textContent = "Converting...";
     downloadBtn.style.display = "none";
+    copyBtn.style.display = "none";
     loader.style.display = "flex";
     stats.innerHTML = "";
     card.classList.remove("card-success", "card-error");
@@ -574,6 +660,20 @@ function showBatchStatus(message, isError = false) {
   batchStatus.classList.toggle("is-error", isError);
 }
 
+function setBatchProgress({
+  percent,
+  message,
+  isError = false,
+  indeterminate = false
+}) {
+  const safePercent = Math.max(0, Math.min(100, Math.round(percent || 0)));
+
+  batchProgress.classList.toggle("is-error", isError);
+  batchProgress.classList.toggle("is-indeterminate", indeterminate);
+  batchProgressFill.style.width = `${safePercent}%`;
+  showBatchStatus(message, isError);
+}
+
 function updateUI() {
   const hasCards = imagesContainer.children.length > 0;
   emptyState.style.display = hasCards ? "none" : "block";
@@ -581,7 +681,10 @@ function updateUI() {
   convertAllBtn.disabled = !hasCards;
 
   if (!hasCards) {
-    showBatchStatus("Drop files, paste screenshots, or add image links to begin.");
+    setBatchProgress({
+      percent: 0,
+      message: "Drop files, paste screenshots, or add image links to begin."
+    });
   }
 }
 
@@ -606,6 +709,7 @@ function syncGlobalControls(settings) {
   globalHeight.value = settings.height;
   globalFit.value = settings.fit;
   globalWatermark.value = settings.watermarkText;
+  globalWatermarkPosition.value = settings.watermarkPosition;
   globalWatermarkOpacity.value = settings.watermarkOpacity;
   globalWatermarkOpacityVal.textContent = `${settings.watermarkOpacity}%`;
 }
@@ -618,6 +722,201 @@ function releaseCardResources(state) {
   if (state.downloadUrl) {
     URL.revokeObjectURL(state.downloadUrl);
   }
+}
+
+function buildConversionFormData(state, settings) {
+  const formData = new FormData();
+
+  if (state.sourceType === "file") {
+    formData.append("image", state.file);
+  } else {
+    formData.append("imageUrl", state.imageUrl);
+  }
+
+  appendSettings(formData, settings);
+  return formData;
+}
+
+async function copyConvertedImage(card) {
+  const state = cards.get(card.dataset.id);
+  const copyBtn = card.querySelector(".copy-btn");
+
+  if (!state?.lastConvertedSettings) {
+    showBatchStatus("Convert the image first, then copy it.", true);
+    return;
+  }
+
+  if (!canCopyImages()) {
+    showBatchStatus("This browser does not support copying images to the clipboard.", true);
+    return;
+  }
+
+  copyBtn.disabled = true;
+  copyBtn.textContent = "Copying...";
+
+  try {
+    let clipboardBlob = state.lastConvertedBlob;
+
+    if (clipboardBlob?.type !== "image/png") {
+      const pngSettings = {
+        ...state.lastConvertedSettings,
+        format: "png"
+      };
+      const response = await fetch("/convert", {
+        method: "POST",
+        body: buildConversionFormData(state, pngSettings)
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({
+          message: "Could not prepare image for clipboard"
+        }));
+        throw new Error(error.message);
+      }
+
+      clipboardBlob = await response.blob();
+    }
+
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        "image/png": clipboardBlob
+      })
+    ]);
+
+    showBatchStatus(`Copied ${state.displayName} to the clipboard.`, false);
+    copyBtn.textContent = "Copied";
+    setTimeout(() => {
+      copyBtn.textContent = "Copy Image";
+    }, 1400);
+  } catch (error) {
+    showBatchStatus(error.message || "Could not copy the converted image.", true);
+    copyBtn.textContent = "Copy Image";
+  } finally {
+    copyBtn.disabled = false;
+  }
+}
+
+function toggleCopyButton(card, isVisible) {
+  const copyBtn = card.querySelector(".copy-btn");
+  copyBtn.style.display = isVisible && canCopyImages() ? "inline-flex" : "none";
+  copyBtn.textContent = "Copy Image";
+}
+
+function canCopyImages() {
+  return Boolean(window.ClipboardItem && navigator.clipboard?.write);
+}
+
+function handleCardDragOver(event) {
+  if (!dragState.activeId) {
+    return;
+  }
+
+  event.preventDefault();
+
+  const draggedCard = imagesContainer.querySelector(`[data-id="${dragState.activeId}"]`);
+
+  if (!draggedCard) {
+    return;
+  }
+
+  const insertBeforeNode = getDragInsertBeforeNode(
+    imagesContainer,
+    event.clientX,
+    event.clientY
+  );
+
+  if (insertBeforeNode) {
+    imagesContainer.insertBefore(draggedCard, insertBeforeNode);
+  } else {
+    imagesContainer.appendChild(draggedCard);
+  }
+}
+
+function getDragInsertBeforeNode(container, clientX, clientY) {
+  const otherCards = [
+    ...container.querySelectorAll(".image-card:not(.dragging)")
+  ];
+
+  if (!otherCards.length) {
+    return null;
+  }
+
+  let closestCard = null;
+  let closestDistance = Number.POSITIVE_INFINITY;
+
+  otherCards.forEach(card => {
+    const rect = card.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const distance = Math.hypot(clientX - centerX, clientY - centerY);
+
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestCard = card;
+    }
+  });
+
+  if (!closestCard) {
+    return null;
+  }
+
+  const rect = closestCard.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  const shouldInsertBefore =
+    clientY < centerY ||
+    (Math.abs(clientY - centerY) < rect.height / 4 && clientX < centerX);
+
+  return shouldInsertBefore ? closestCard : closestCard.nextElementSibling;
+}
+
+function sendBatchRequest(formData, handlers = {}) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    xhr.open("POST", "/convert-all");
+    xhr.responseType = "blob";
+
+    xhr.upload.onprogress = event => {
+      if (event.lengthComputable) {
+        handlers.onUploadProgress?.(event.loaded / event.total);
+      } else {
+        handlers.onServerWork?.();
+      }
+    };
+
+    xhr.onreadystatechange = () => {
+      if (xhr.readyState === XMLHttpRequest.HEADERS_RECEIVED) {
+        handlers.onServerWork?.();
+      }
+    };
+
+    xhr.onprogress = event => {
+      if (event.lengthComputable) {
+        handlers.onDownloadProgress?.(event.loaded / event.total);
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error("Network error during batch conversion."));
+    };
+
+    xhr.onload = async () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(xhr.response);
+        return;
+      }
+
+      try {
+        const message = JSON.parse(await xhr.response.text()).message;
+        reject(new Error(message || "Batch conversion failed."));
+      } catch (error) {
+        reject(new Error("Batch conversion failed."));
+      }
+    };
+
+    xhr.send(formData);
+  });
 }
 
 function preparePastedFile(file) {

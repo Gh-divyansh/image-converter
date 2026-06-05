@@ -100,12 +100,31 @@
         </label>
 
         <label class="field">
+          <span>Watermark position</span>
+          <select id="globalWatermarkPosition" class="global-select">
+            <option value="southeast">Bottom right</option>
+            <option value="southwest">Bottom left</option>
+            <option value="northeast">Top right</option>
+            <option value="northwest">Top left</option>
+            <option value="south">Bottom center</option>
+            <option value="north">Top center</option>
+            <option value="center">Center</option>
+          </select>
+        </label>
+
+        <label class="field">
           <span>Watermark opacity</span>
           <div class="range-field">
             <input type="range" id="globalWatermarkOpacity" min="0" max="100" value="18" />
             <strong id="globalWatermarkOpacityVal" class="range-value">18%</strong>
           </div>
         </label>
+      </div>
+
+      <div class="batch-progress" id="batchProgress" aria-hidden="true">
+        <div class="batch-progress-track">
+          <div class="batch-progress-fill" id="batchProgressFill"></div>
+        </div>
       </div>
 
       <p class="batch-status" id="batchStatus">Drop files, paste screenshots, or add image links to begin.</p>
